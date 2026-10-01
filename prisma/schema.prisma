@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String?
+  role         String    @default("rep") // admin, manager, rep
+  createdAt    DateTime  @default(now())
+
+  notes        Note[]
+  contacts     Contact[]
+  deals        Deal[]
+}
+
+model Company {
+  id       String    @id @default(cuid())
+  name     String
+  domain   String    @unique
+  industry String
+  size     String    // startup, smb, mid-market, enterprise
+
+  contacts Contact[]
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String?
+  firstName   String
+  lastName    String
+  email       String   @unique
+  phone       String?
+  title       String?
+  status      String   @default("prospect") // prospect, active, churned, closed-won, closed-lost
+  intentScore Int      @default(0) // 0-100
+
+  company        Company         @relation(fields: [companyId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
+  deals          Deal[]
+  timelineEvents TimelineEvent[]
+  notes          Note[]
+}
+
+model Deal {
+  id                String    @id @default(cuid())
+  contactId         String
+  userId            String?
+  title             String
+  value             Float
+  stage             String    // discovery, qualification, proposal, negotiation, closed-won, closed-lost
+  probability       Int       @default(50) // 0-100
+  expectedCloseDate DateTime
+
+  contact        Contact         @relation(fields: [contactId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
+  timelineEvents TimelineEvent[]
+}
+
+model TimelineEvent {
+  id        String   @id @default(cuid())
+  contactId String?
+  dealId    String?
+  type      String   // email_open, email_sent, call, meeting, note, deal_stage_change, demo
+  metadata  String   // JSON string with event-specific data
+  createdAt DateTime @default(now())
+
+  contact Contact? @relation(fields: [contactId], references: [id])
+  deal    Deal?    @relation(fields: [dealId], references: [id])
+}
+
+model Note {
+  id          String   @id @default(cuid())
+  contactId   String
+  authorId    String
+  rawContent  String
+  summary     String?
+  actionItems String?  // JSON array of action items
+  createdAt   DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  author  User    @relation(fields: [authorId], references: [id])
+}
