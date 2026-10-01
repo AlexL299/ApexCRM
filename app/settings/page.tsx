@@ -17,6 +17,12 @@ import {
   Save,
   Server,
   Sparkles,
+  Download,
+  FileSpreadsheet,
+  FileCode2,
+  Lock,
+  Workflow,
+  Check,
 } from 'lucide-react'
 import { useToast } from '@/components/ui/Toast'
 
@@ -34,6 +40,7 @@ interface SystemStatus {
     provider: string
     sdk: string
     status: string
+    maskedKey?: string
     primaryModel: string
     fallbackModels: string[]
     features: string[]
@@ -46,9 +53,19 @@ interface SystemStatus {
   }
 }
 
+const DEFAULT_STAGES = [
+  { key: 'discovery', label: 'Lead In / Discovery', prob: 20, color: '#64748b', desc: 'Initial inbound inquiry or prospect research' },
+  { key: 'contact_made', label: 'Contact Made', prob: 30, color: '#38bdf8', desc: 'First meeting or discovery call completed' },
+  { key: 'qualification', label: 'Needs Defined / Qualification', prob: 45, color: '#3b82f6', desc: 'Budget, authority, and requirements validated' },
+  { key: 'proposal', label: 'Proposal Sent', prob: 60, color: '#a855f7', desc: 'Formal quote or platform scope delivered' },
+  { key: 'negotiation', label: 'In Negotiation', prob: 80, color: '#f59e0b', desc: 'Contract redlines, security review, and SLA alignment' },
+  { key: 'closed_won', label: 'Won / Signed', prob: 100, color: '#10b981', desc: 'Contract executed and onboarding initialized' },
+  { key: 'closed_lost', label: 'Lost / Closed', prob: 0, color: '#ef4444', desc: 'Deals disqualified or deferred to future quarters' },
+]
+
 export default function SettingsPage() {
   const { addToast } = useToast()
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'system'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'system' | 'data'>('profile')
 
   // Profile Form State
   const [name, setName] = useState('')
@@ -61,14 +78,17 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false)
 
   // Preferences Form State
-  const [currency, setCurrency] = useState('USD')
+  const [currency, setCurrency] = useState('AUD')
   const [defaultStage, setDefaultStage] = useState('discovery')
-  const [timezone, setTimezone] = useState('America/New_York')
+  const [timezone, setTimezone] = useState('Australia/Sydney')
   const [highIntentThreshold, setHighIntentThreshold] = useState(75)
 
   // System Status State
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [testingHealth, setTestingHealth] = useState(false)
+
+  // Data Export state
+  const [exportingJson, setExportingJson] = useState(false)
 
   useEffect(() => {
     // Load profile
@@ -172,6 +192,35 @@ export default function SettingsPage() {
     })
   }
 
+  const handleExportJson = async () => {
+    setExportingJson(true)
+    try {
+      const res = await fetch('/api/export/crm-json')
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `apexcrm-backup-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      addToast({
+        title: 'JSON Export Complete',
+        description: 'Full database snapshot downloaded to your device.',
+        type: 'success',
+      })
+    } catch (err: any) {
+      addToast({
+        title: 'Export Error',
+        description: err?.message || 'Failed to export JSON backup',
+        type: 'error',
+      })
+    } finally {
+      setExportingJson(false)
+    }
+  }
+
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', paddingBottom: 60 }}>
       {/* Page Header */}
@@ -179,7 +228,7 @@ export default function SettingsPage() {
         <div>
           <h1 className="page-title">Workspace Settings</h1>
           <p className="page-subtitle">
-            Manage your personal profile, CRM pipeline rules, and inspect system telemetry.
+            Manage your personal profile, CRM pipeline rules, cloud integrations, and data backups.
           </p>
         </div>
       </div>
@@ -195,7 +244,6 @@ export default function SettingsPage() {
       >
         <button
           onClick={() => setActiveTab('profile')}
-          className={`tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
           style={{
             padding: '10px 16px',
             fontSize: 13.5,
@@ -212,12 +260,11 @@ export default function SettingsPage() {
           }}
         >
           <User size={15} />
-          Profile & Security
+          User Profile
         </button>
 
         <button
           onClick={() => setActiveTab('preferences')}
-          className={`tab-btn ${activeTab === 'preferences' ? 'active' : ''}`}
           style={{
             padding: '10px 16px',
             fontSize: 13.5,
@@ -239,7 +286,6 @@ export default function SettingsPage() {
 
         <button
           onClick={() => setActiveTab('system')}
-          className={`tab-btn ${activeTab === 'system' ? 'active' : ''}`}
           style={{
             padding: '10px 16px',
             fontSize: 13.5,
@@ -256,7 +302,7 @@ export default function SettingsPage() {
           }}
         >
           <Server size={15} />
-          System & API Status
+          System & Integrations
           <span
             style={{
               width: 8,
@@ -267,9 +313,30 @@ export default function SettingsPage() {
             }}
           />
         </button>
+
+        <button
+          onClick={() => setActiveTab('data')}
+          style={{
+            padding: '10px 16px',
+            fontSize: 13.5,
+            fontWeight: 500,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            borderBottom: activeTab === 'data' ? '2px solid var(--accent-500)' : '2px solid transparent',
+            color: activeTab === 'data' ? 'white' : 'var(--text-muted)',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <Download size={15} />
+          Data Management
+        </button>
       </div>
 
-      {/* Tab 1: Profile & Security */}
+      {/* Tab 1: User Profile */}
       {activeTab === 'profile' && (
         <div className="card" style={{ padding: 28 }}>
           {loadingProfile ? (
@@ -322,7 +389,7 @@ export default function SettingsPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
                 <div>
                   <label className="form-label" style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                    Full Display Name
+                    Display Name
                   </label>
                   <input
                     type="text"
@@ -363,14 +430,14 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Security / Password Change */}
+              {/* Change Password Form */}
               <div style={{ paddingTop: 14, borderTop: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <Key size={15} className="text-indigo-400" />
-                  Security & Password Update
+                  Change Password
                 </div>
                 <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-                  Leave password fields blank if you only wish to update your name or email.
+                  Update your authentication credentials. Minimum 6 characters.
                 </p>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
@@ -455,7 +522,7 @@ export default function SettingsPage() {
                   ) : (
                     <>
                       <Save size={15} />
-                      Save Changes
+                      Save Profile Changes
                     </>
                   )}
                 </button>
@@ -465,156 +532,184 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Tab 2: CRM Preferences */}
+      {/* Tab 2: CRM Preferences & Deal Stage Manager */}
       {activeTab === 'preferences' && (
-        <div className="card" style={{ padding: 28 }}>
-          <form onSubmit={handleSavePreferences} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'white', marginBottom: 4 }}>
-                Pipeline & Display Localization
-              </div>
-              <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-                Configure currency display, initial opportunity staging, and active timezone.
-              </p>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              {/* Currency */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Preferences Form */}
+          <div className="card" style={{ padding: 28 }}>
+            <form onSubmit={handleSavePreferences} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
               <div>
-                <label className="form-label" style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  Default Workspace Currency
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <DollarSign size={15} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-muted)' }} />
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    style={{
-                      width: '100%',
-                      background: 'var(--bg-input)',
-                      border: '1px solid var(--border-default)',
-                      borderRadius: 8,
-                      padding: '9px 12px 9px 32px',
-                      color: 'white',
-                      fontSize: 14,
-                    }}
-                  >
-                    <option value="USD">USD ($) — United States Dollar</option>
-                    <option value="EUR">EUR (€) — Euro</option>
-                    <option value="GBP">GBP (£) — British Pound</option>
-                    <option value="AUD">AUD ($) — Australian Dollar</option>
-                    <option value="CAD">CAD ($) — Canadian Dollar</option>
-                    <option value="SGD">SGD ($) — Singapore Dollar</option>
-                  </select>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'white', marginBottom: 4 }}>
+                  Currency & Timezone Localization
                 </div>
+                <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                  Configure active currency, initial opportunity staging, and active timezone.
+                </p>
               </div>
 
-              {/* Default Pipeline Stage */}
-              <div>
-                <label className="form-label" style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  Default New Deal Stage
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Layers size={15} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-muted)' }} />
-                  <select
-                    value={defaultStage}
-                    onChange={(e) => setDefaultStage(e.target.value)}
-                    style={{
-                      width: '100%',
-                      background: 'var(--bg-input)',
-                      border: '1px solid var(--border-default)',
-                      borderRadius: 8,
-                      padding: '9px 12px 9px 32px',
-                      color: 'white',
-                      fontSize: 14,
-                    }}
-                  >
-                    <option value="discovery">Discovery (20% Win Probability)</option>
-                    <option value="qualification">Qualification (40% Win Probability)</option>
-                    <option value="proposal">Proposal Sent (60% Win Probability)</option>
-                    <option value="negotiation">Negotiation (80% Win Probability)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-              {/* Timezone */}
-              <div>
-                <label className="form-label" style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  System Timezone
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <Globe size={15} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-muted)' }} />
-                  <select
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    style={{
-                      width: '100%',
-                      background: 'var(--bg-input)',
-                      border: '1px solid var(--border-default)',
-                      borderRadius: 8,
-                      padding: '9px 12px 9px 32px',
-                      color: 'white',
-                      fontSize: 14,
-                    }}
-                  >
-                    <option value="America/New_York">Eastern Time (US & Canada) (UTC-5)</option>
-                    <option value="America/Chicago">Central Time (US & Canada) (UTC-6)</option>
-                    <option value="America/Los_Angeles">Pacific Time (US & Canada) (UTC-8)</option>
-                    <option value="Europe/London">London / GMT (UTC+0)</option>
-                    <option value="Europe/Paris">Paris / Berlin (UTC+1)</option>
-                    <option value="Asia/Tokyo">Tokyo / Japan (UTC+9)</option>
-                    <option value="Australia/Sydney">Sydney / Melbourne (UTC+10)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* High Intent Score Threshold */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <label className="form-label" style={{ fontSize: 13, fontWeight: 500 }}>
-                    High-Intent Lead Highlight Threshold
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                {/* Currency */}
+                <div>
+                  <label className="form-label" style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+                    Workspace Currency
                   </label>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#34d399' }}>{highIntentThreshold}%</span>
+                  <div style={{ position: 'relative' }}>
+                    <DollarSign size={15} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-muted)' }} />
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 8,
+                        padding: '9px 12px 9px 32px',
+                        color: 'white',
+                        fontSize: 14,
+                      }}
+                    >
+                      <option value="AUD">AUD (A$) — Australian Dollar</option>
+                      <option value="USD">USD ($) — United States Dollar</option>
+                      <option value="EUR">EUR (€) — Euro</option>
+                      <option value="GBP">GBP (£) — British Pound</option>
+                      <option value="CAD">CAD ($) — Canadian Dollar</option>
+                      <option value="SGD">SGD ($) — Singapore Dollar</option>
+                    </select>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="50"
-                  max="95"
-                  value={highIntentThreshold}
-                  onChange={(e) => setHighIntentThreshold(parseInt(e.target.value, 10))}
-                  style={{ width: '100%', accentColor: 'var(--accent-500)', height: 6, marginTop: 8 }}
-                />
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                  Contacts with intent score &ge; {highIntentThreshold} will display with priority status badges.
+
+                {/* Timezone */}
+                <div>
+                  <label className="form-label" style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+                    Timezone
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Globe size={15} style={{ position: 'absolute', left: 10, top: 11, color: 'var(--text-muted)' }} />
+                    <select
+                      value={timezone}
+                      onChange={(e) => setTimezone(e.target.value)}
+                      style={{
+                        width: '100%',
+                        background: 'var(--bg-input)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 8,
+                        padding: '9px 12px 9px 32px',
+                        color: 'white',
+                        fontSize: 14,
+                      }}
+                    >
+                      <option value="Australia/Sydney">Australia/Sydney (AEST / AEDT, UTC+10/11)</option>
+                      <option value="Australia/Melbourne">Australia/Melbourne (AEST, UTC+10)</option>
+                      <option value="Australia/Perth">Australia/Perth (AWST, UTC+8)</option>
+                      <option value="UTC">UTC (Universal Coordinated Time)</option>
+                      <option value="America/New_York">America/New_York (Eastern Time, UTC-5)</option>
+                      <option value="America/Chicago">America/Chicago (Central Time, UTC-6)</option>
+                      <option value="America/Los_Angeles">America/Los_Angeles (Pacific Time, UTC-8)</option>
+                      <option value="Europe/London">Europe/London (GMT / BST, UTC+0/1)</option>
+                      <option value="Europe/Paris">Europe/Paris (CET, UTC+1)</option>
+                      <option value="Asia/Tokyo">Asia/Tokyo (JST, UTC+9)</option>
+                      <option value="Asia/Singapore">Asia/Singapore (SGT, UTC+8)</option>
+                    </select>
+                  </div>
                 </div>
               </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6 }}>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontSize: 13.5 }}
+                >
+                  <Save size={15} />
+                  Save Preferences
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Deal Stage Manager */}
+          <div className="card" style={{ padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Workflow size={16} className="text-indigo-400" />
+                  Deal Stage Manager
+                </div>
+                <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Default sales pipeline stage progression, probability weighting, and criteria.
+                </p>
+              </div>
+              <span
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: 'var(--accent-glow)',
+                  color: 'var(--accent-300)',
+                }}
+              >
+                7 Configured Stages
+              </span>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10 }}>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', fontSize: 13.5 }}
-              >
-                <Save size={15} />
-                Save CRM Preferences
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {DEFAULT_STAGES.map((stg, idx) => (
+                <div
+                  key={stg.key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: 'var(--bg-overlay)',
+                    borderRadius: 8,
+                    borderLeft: `4px solid ${stg.color}`,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', width: 18 }}>
+                      0{idx + 1}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'white' }}>{stg.label}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{stg.desc}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Win Probability</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: stg.prob >= 80 ? '#34d399' : stg.prob === 0 ? '#f87171' : 'white' }}>
+                        {stg.prob}%
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: stg.color,
+                        boxShadow: `0 0 8px ${stg.color}aa`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
-          </form>
+          </div>
         </div>
       )}
 
-      {/* Tab 3: System & API Status */}
+      {/* Tab 3: System & Integrations Status */}
       {activeTab === 'system' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Action Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Live Cloud Integrations</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Cloud Integrations & Service Health</div>
               <div style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
-                Real-time operational health checks for Supabase PostgreSQL and Google Gemini AI.
+                Live operational health checks for Supabase Cloud PostgreSQL and Google Gemini AI.
               </div>
             </div>
             <button
@@ -649,7 +744,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Supabase PostgreSQL</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cloud Database Engine</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cloud Relational Database</div>
                   </div>
                 </div>
 
@@ -680,24 +775,24 @@ export default function SettingsPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>Latency:</span>
+                  <span>Round-Trip Latency:</span>
                   <span style={{ color: '#34d399', fontWeight: 600 }}>
                     {systemStatus?.database.latencyMs !== undefined ? `${systemStatus.database.latencyMs} ms` : 'Testing...'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>Host:</span>
+                  <span>Pooler Endpoint:</span>
                   <span style={{ color: 'white', fontFamily: 'monospace', fontSize: 11.5 }}>
                     {systemStatus?.database.poolerHost || 'aws-0-ap-southeast-2.pooler.supabase.com'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                   <span>Connection Mode:</span>
-                  <span style={{ color: 'white' }}>Transaction Pooler (PgBouncer :6543)</span>
+                  <span style={{ color: 'white' }}>PgBouncer Transaction Pooler (:6543)</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                   <span>Direct Port:</span>
-                  <span style={{ color: 'white' }}>Port 5432 (Migrations/DDL)</span>
+                  <span style={{ color: 'white' }}>Port 5432 (Migrations & Schema Push)</span>
                 </div>
               </div>
             </div>
@@ -722,7 +817,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'white' }}>Google Gemini AI</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cognitive Automation Layer</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Cognitive Intelligence Engine</div>
                   </div>
                 </div>
 
@@ -747,14 +842,20 @@ export default function SettingsPage() {
                       background: systemStatus?.ai.status === 'active' ? 'var(--accent-400)' : '#ef4444',
                     }}
                   />
-                  {systemStatus?.ai.status === 'active' ? 'Operational' : 'Unavailable'}
+                  {systemStatus?.ai.status === 'active' ? 'Active' : 'Unavailable'}
                 </div>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                  <span>API Key:</span>
+                  <span style={{ color: 'var(--accent-300)', fontFamily: 'monospace', fontSize: 11.5 }}>
+                    {systemStatus?.ai.maskedKey || 'AQ.Ab8R••••••••••••••Fl0Fg1XmOg'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                   <span>Primary Model:</span>
-                  <span style={{ color: 'var(--accent-300)', fontWeight: 600, fontFamily: 'monospace' }}>
+                  <span style={{ color: 'white', fontFamily: 'monospace' }}>
                     {systemStatus?.ai.primaryModel || 'gemini-3.5-flash'}
                   </span>
                 </div>
@@ -763,40 +864,104 @@ export default function SettingsPage() {
                   <span style={{ color: 'white', fontFamily: 'monospace' }}>@google/genai (v1.0.0)</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>Active Capabilities:</span>
-                  <span style={{ color: 'white' }}>Notes, Next-Action, Email, Copilot</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                  <span>JSON Mode:</span>
-                  <span style={{ color: '#34d399', fontWeight: 600 }}>Enabled (Structured Schema)</span>
+                  <span>Active Pipelines:</span>
+                  <span style={{ color: '#34d399', fontWeight: 600 }}>Smart Notes, Deal Insights, Copilot</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Runtime Architecture Card */}
-          <div className="card" style={{ padding: 22 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'white', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Cpu size={16} className="text-indigo-400" />
-              Runtime Stack & Build Architecture
+      {/* Tab 4: Data Management & Backups */}
+      {activeTab === 'data' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="card" style={{ padding: 28 }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'white', marginBottom: 4 }}>
+                CRM Data Export & Disaster Recovery
+              </div>
+              <p style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>
+                Download real-time snapshots of contacts, companies, active pipeline deals, and timeline event logs.
+              </p>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              <div style={{ padding: 12, background: 'var(--bg-overlay)', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Framework</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'white', marginTop: 2 }}>Next.js 16.3.7</div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+              {/* CSV Export Option */}
+              <div style={{ padding: 18, background: 'var(--bg-overlay)', borderRadius: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34d399', marginBottom: 6 }}>
+                    <FileSpreadsheet size={18} />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>Contacts & Deals (CSV)</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 16 }}>
+                    Formatted tabular export optimized for Excel, Google Sheets, or importing into external analytics platforms.
+                  </p>
+                </div>
+                <a
+                  href="/api/export/csv"
+                  download
+                  className="btn btn-secondary btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, textDecoration: 'none' }}
+                >
+                  <Download size={13} /> Download CSV Export
+                </a>
               </div>
-              <div style={{ padding: 12, background: 'var(--bg-overlay)', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>React Engine</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'white', marginTop: 2 }}>React 19.2.8</div>
+
+              {/* JSON Backup Option */}
+              <div style={{ padding: 18, background: 'var(--bg-overlay)', borderRadius: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent-400)', marginBottom: 6 }}>
+                    <FileCode2 size={18} />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'white' }}>Full CRM Backup (JSON)</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: 16 }}>
+                    Complete database relational snapshot including Users, Companies, Contacts, Deals, Notes, and Timelines.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportJson}
+                  disabled={exportingJson}
+                  className="btn btn-primary btn-sm"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  {exportingJson ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" /> Generating Snapshot...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={13} /> Export Full CRM Data (JSON)
+                    </>
+                  )}
+                </button>
               </div>
-              <div style={{ padding: 12, background: 'var(--bg-overlay)', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>ORM Client</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'white', marginTop: 2 }}>Prisma 6.19.3</div>
+            </div>
+
+            {/* Account & Storage Preferences */}
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 18 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: 'white', marginBottom: 4 }}>
+                Client-Side Storage & Cache Preferences
               </div>
-              <div style={{ padding: 12, background: 'var(--bg-overlay)', borderRadius: 8 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Bundler</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'white', marginTop: 2 }}>Turbopack</div>
-              </div>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+                ApexCRM caches active filter selections, recent copilot queries, and display preferences locally.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('apex_crm_preferences')
+                  addToast({
+                    title: 'Local Cache Cleared',
+                    description: 'Local workspace preferences have been reset to factory defaults.',
+                    type: 'info',
+                  })
+                }}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: 12, color: 'var(--text-muted)', border: '1px solid var(--border-default)' }}
+              >
+                Reset Local Storage Cache
+              </button>
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { TrendingUp, DollarSign, MoreHorizontal, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/components/ui/Toast'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -62,10 +63,15 @@ function DealCard({
   stages: typeof STAGES
   onStageChange: (id: string, stage: string) => void
 }) {
+  const router = useRouter()
   const contactName = `${deal.contact.firstName} ${deal.contact.lastName}`
 
   return (
-    <div className="deal-card">
+    <div
+      className="deal-card"
+      style={{ cursor: 'pointer' }}
+      onClick={() => router.push(`/deals/${deal.id}`)}
+    >
       <div className="deal-card-title">{deal.title}</div>
       <div className="deal-card-company">{deal.contact.company.name}</div>
 

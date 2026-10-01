@@ -20,29 +20,37 @@ export async function GET() {
   const hasGeminiKey = !!process.env.GEMINI_API_KEY
   const hasSupabaseUrl = !!process.env.DATABASE_URL
 
-  return NextResponse.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    totalLatencyMs: Date.now() - startTime,
-    database: {
-      provider: 'Supabase PostgreSQL',
-      poolerHost: 'aws-0-ap-southeast-2.pooler.supabase.com',
-      poolerPort: 6543,
-      directPort: 5432,
-      configured: hasSupabaseUrl,
-      status: dbStatus,
-      latencyMs: dbLatency,
-      error: dbError,
-    },
-    ai: {
-      provider: "Google Cloud Gemini",
-      sdk: "@google/genai",
-      configured: hasGeminiKey,
-      status: hasGeminiKey ? 'active' : 'missing_key',
-      primaryModel: 'gemini-3.5-flash',
-      fallbackModels: ['gemini-flash-latest', 'gemini-3.1-flash-lite'],
-      features: ['Smart Notes', 'Predictive Next-Action', 'Email Drafting', 'Copilot Drawer'],
-    },
+    const rawKey = process.env.GEMINI_API_KEY || ''
+    const maskedKey = rawKey.length > 12
+      ? `${rawKey.slice(0, 8)}••••••••••••${rawKey.slice(-8)}`
+      : rawKey
+      ? '••••••••'
+      : 'Not configured'
+
+    return NextResponse.json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      totalLatencyMs: Date.now() - startTime,
+      database: {
+        provider: 'Supabase PostgreSQL',
+        poolerHost: 'aws-0-ap-southeast-2.pooler.supabase.com',
+        poolerPort: 6543,
+        directPort: 5432,
+        configured: hasSupabaseUrl,
+        status: dbStatus,
+        latencyMs: dbLatency,
+        error: dbError,
+      },
+      ai: {
+        provider: "Google Cloud Gemini",
+        sdk: "@google/genai",
+        configured: hasGeminiKey,
+        status: hasGeminiKey ? 'active' : 'missing_key',
+        maskedKey,
+        primaryModel: 'gemini-3.5-flash',
+        fallbackModels: ['gemini-flash-latest', 'gemini-3.1-flash-lite'],
+        features: ['Smart Notes', 'Predictive Next-Action', 'Email Drafting', 'Copilot Drawer'],
+      },
     runtime: {
       framework: 'Next.js 16.3.7',
       react: 'React 19.2.8',
