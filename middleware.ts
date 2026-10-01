@@ -12,6 +12,8 @@ const PROTECTED_PATHS = [
   '/',
   '/pipeline',
   '/contacts',
+  '/deals',
+  '/leads',
   '/analytics',
   '/activities',
   '/settings',

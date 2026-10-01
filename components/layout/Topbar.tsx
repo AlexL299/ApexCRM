@@ -49,7 +49,7 @@ export function Topbar() {
           New Lead
         </Link>
 
-        <Link href="/pipeline/new" id="new-deal-btn" className="btn btn-primary btn-sm">
+        <Link href="/deals/new" id="new-deal-btn" className="btn btn-primary btn-sm">
           <Plus size={13} strokeWidth={2.5} />
           New Deal
         </Link>

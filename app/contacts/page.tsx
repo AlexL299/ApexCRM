@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import { TrendingUp, Building2, Mail, Phone, ChevronRight } from 'lucide-react'
 import { ExportDataButton } from '@/components/ui/ExportDataButton'
+import { ImportContactsButton } from '@/components/contacts/ImportContactsButton'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -55,6 +56,7 @@ export default async function ContactsPage() {
           <p className="page-subtitle">Your complete contact directory</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <ImportContactsButton />
           <ExportDataButton />
           <Link href="/contacts/new" className="btn btn-primary btn-sm">
             + New Contact

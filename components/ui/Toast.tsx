@@ -18,6 +18,7 @@ interface ToastContextValue {
   error: (message: string, duration?: number) => void
   info: (message: string, duration?: number) => void
   warning: (message: string, duration?: number) => void
+  addToast: (options: { title?: string; description?: string; message?: string; type?: ToastType; duration?: number }) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
@@ -56,8 +57,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const info = useCallback((msg: string, d?: number) => showToast(msg, 'info', d), [showToast])
   const warning = useCallback((msg: string, d?: number) => showToast(msg, 'warning', d), [showToast])
 
+  const addToast = useCallback(
+    (options: { title?: string; description?: string; message?: string; type?: ToastType; duration?: number }) => {
+      const msg = [options.title, options.description || options.message].filter(Boolean).join(' — ') || 'Notification'
+      showToast(msg, options.type || 'info', options.duration)
+    },
+    [showToast]
+  )
+
   return (
-    <ToastContext.Provider value={{ showToast, success, error, info, warning }}>
+    <ToastContext.Provider value={{ showToast, success, error, info, warning, addToast }}>
       {children}
       {/* Toast viewport */}
       <div
