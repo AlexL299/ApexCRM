@@ -72,50 +72,94 @@ Scoring guide: 70-100 = hot (strong intent, clear need), 40-69 = warm (some inte
       console.warn('[Webhook] Gemini scoring failed, using defaults:', geminiErr)
     }
 
-    // ── Resolve or Create Company ─────────────────────────────────────────
-    let companyId: string
+    // ── Resolve or Create Company (safe upsert) ───────────────────────────
+    // Public email provider domains must never be used as company domains —
+    // they are shared across millions of users and will always collide.
+    const PUBLIC_EMAIL_DOMAINS = new Set([
+      'gmail.com', 'googlemail.com',
+      'yahoo.com', 'yahoo.co.uk', 'yahoo.com.au',
+      'outlook.com', 'hotmail.com', 'hotmail.co.uk',
+      'live.com', 'msn.com',
+      'icloud.com', 'me.com', 'mac.com',
+      'protonmail.com', 'proton.me',
+      'aol.com', 'mail.com', 'zoho.com',
+    ])
 
-    if (company) {
-      const cleanCompanyName = String(company).trim()
-      const emailDomain = normalizedEmail.split('@')[1] || 'unknown.com'
+    const emailDomain = normalizedEmail.split('@')[1] || 'unknown.com'
+    const isPublicDomain = PUBLIC_EMAIL_DOMAINS.has(emailDomain)
 
-      const existingCompany = await prisma.company.findFirst({
-        where: { name: { equals: cleanCompanyName, mode: 'insensitive' } },
+    /**
+     * Safely find or create a company, never crashing on unique domain conflicts.
+     * Priority order:
+     *   1. Match by exact name (case-insensitive)
+     *   2. Match by domain (if not a public provider)
+     *   3. Create a new record with a guaranteed-unique synthetic domain
+     */
+    async function findOrCreateCompany(
+      companyName: string,
+      preferredDomain: string | null
+    ): Promise<string> {
+      // 1. Try match by name first
+      const byName = await prisma.company.findFirst({
+        where: { name: { equals: companyName, mode: 'insensitive' } },
       })
+      if (byName) return byName.id
 
-      if (existingCompany) {
-        companyId = existingCompany.id
-      } else {
-        const sanitized = cleanCompanyName.toLowerCase().replace(/[^a-z0-9]/g, '')
-        const newCompany = await prisma.company.create({
+      // 2. Try match by domain (only if it's a real business domain)
+      if (preferredDomain && !isPublicDomain) {
+        const byDomain = await prisma.company.findFirst({
+          where: { domain: preferredDomain },
+        })
+        if (byDomain) return byDomain.id
+      }
+
+      // 3. Build a guaranteed-unique domain for the new record
+      const sanitized = companyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'
+      const uniqueDomain =
+        preferredDomain && !isPublicDomain
+          ? preferredDomain
+          : `${sanitized}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}.crm`
+
+      // 4. Create — if another request races us, fall back to the winner's record
+      try {
+        const created = await prisma.company.create({
           data: {
-            name: cleanCompanyName,
-            domain: emailDomain,
+            name: companyName,
+            domain: uniqueDomain,
             industry: 'Technology',
             size: 'startup',
           },
         })
-        companyId = newCompany.id
-      }
-    } else {
-      // Fallback: find or create a generic "Inbound Leads" company
-      const fallback = await prisma.company.findFirst({
-        where: { name: 'Inbound Leads' },
-      })
-      if (fallback) {
-        companyId = fallback.id
-      } else {
-        const fb = await prisma.company.create({
-          data: {
-            name: 'Inbound Leads',
-            domain: `inbound-${Date.now().toString(36)}.io`,
-            industry: 'Various',
-            size: 'startup',
-          },
-        })
-        companyId = fb.id
+        return created.id
+      } catch (createErr: any) {
+        // Unique constraint race — another request already created this company
+        if (createErr?.code === 'P2002') {
+          const fallback = await prisma.company.findFirst({
+            where: {
+              OR: [
+                { name: { equals: companyName, mode: 'insensitive' } },
+                ...(preferredDomain && !isPublicDomain ? [{ domain: preferredDomain }] : []),
+              ],
+            },
+          })
+          if (fallback) return fallback.id
+        }
+        throw createErr
       }
     }
+
+    let companyId: string
+
+    if (company && String(company).trim().length > 0) {
+      const cleanCompanyName = String(company).trim()
+      // Only use email domain as company domain if it's a real business domain
+      const companyDomain = isPublicDomain ? null : emailDomain
+      companyId = await findOrCreateCompany(cleanCompanyName, companyDomain)
+    } else {
+      // No company name supplied — use the shared "Inbound Leads" bucket
+      companyId = await findOrCreateCompany('Inbound Leads', null)
+    }
+
 
     // ── Upsert Contact ────────────────────────────────────────────────────
     const existing = await prisma.contact.findUnique({

@@ -46,26 +46,78 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Resolve company
+    // Resolve company — safe find-or-create to avoid unique constraint crashes
+    const PUBLIC_EMAIL_DOMAINS = new Set([
+      'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.uk', 'yahoo.com.au',
+      'outlook.com', 'hotmail.com', 'hotmail.co.uk', 'live.com', 'msn.com',
+      'icloud.com', 'me.com', 'mac.com', 'protonmail.com', 'proton.me',
+      'aol.com', 'mail.com', 'zoho.com',
+    ])
+
     let targetCompanyId = companyId
 
     if (!targetCompanyId) {
       const cleanCompanyName = String(companyName || 'General Enterprise').trim()
-      // Generate domain from company name or email domain
-      const emailDomain = normalizedEmail.includes('@') ? normalizedEmail.split('@')[1] : 'acme.com'
-      const sanitizedName = cleanCompanyName.toLowerCase().replace(/[^a-z0-9]/g, '')
-      const domain = `${sanitizedName || 'company'}-${Date.now().toString(36)}.io`
+      const emailDomain = normalizedEmail.includes('@') ? normalizedEmail.split('@')[1] : ''
+      const isPublicDomain = PUBLIC_EMAIL_DOMAINS.has(emailDomain)
 
-      const comp = await prisma.company.create({
-        data: {
-          name: cleanCompanyName,
-          domain: emailDomain || domain,
-          industry: 'Technology',
-          size: 'mid-market',
-        },
+      // 1. Match by company name first (case-insensitive)
+      const byName = await prisma.company.findFirst({
+        where: { name: { equals: cleanCompanyName, mode: 'insensitive' } },
       })
-      targetCompanyId = comp.id
+      if (byName) {
+        targetCompanyId = byName.id
+      } else if (emailDomain && !isPublicDomain) {
+        // 2. Match by business email domain
+        const byDomain = await prisma.company.findFirst({
+          where: { domain: emailDomain },
+        })
+        if (byDomain) {
+          targetCompanyId = byDomain.id
+        }
+      }
+
+      if (!targetCompanyId) {
+        // 3. Create with a guaranteed-unique synthetic domain
+        const sanitizedName = cleanCompanyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'
+        const uniqueDomain =
+          emailDomain && !isPublicDomain
+            ? emailDomain
+            : `${sanitizedName}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}.crm`
+
+        try {
+          const comp = await prisma.company.create({
+            data: {
+              name: cleanCompanyName,
+              domain: uniqueDomain,
+              industry: 'Technology',
+              size: 'mid-market',
+            },
+          })
+          targetCompanyId = comp.id
+        } catch (err: any) {
+          if (err?.code === 'P2002') {
+            // Race condition — another request won; find the existing record
+            const existing = await prisma.company.findFirst({
+              where: {
+                OR: [
+                  { name: { equals: cleanCompanyName, mode: 'insensitive' } },
+                  ...(emailDomain && !isPublicDomain ? [{ domain: emailDomain }] : []),
+                ],
+              },
+            })
+            if (existing) {
+              targetCompanyId = existing.id
+            } else {
+              throw err
+            }
+          } else {
+            throw err
+          }
+        }
+      }
     }
+
 
     const contact = await prisma.contact.create({
       data: {

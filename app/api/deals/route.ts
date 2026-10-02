@@ -62,18 +62,36 @@ export async function POST(req: NextRequest) {
       }
 
       if (!targetContactId) {
-        // Resolve or create company
+        // Resolve or create company — safe find-or-create to avoid unique domain collisions
         const cleanCompanyName = String(companyName || 'Apex Prospects').trim()
-        const domain = `${cleanCompanyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'}-${Date.now().toString(36)}.io`
 
-        const comp = await prisma.company.create({
-          data: {
-            name: cleanCompanyName,
-            domain,
-            industry: 'Technology',
-            size: 'mid-market',
-          },
+        let comp = await prisma.company.findFirst({
+          where: { name: { equals: cleanCompanyName, mode: 'insensitive' } },
         })
+
+        if (!comp) {
+          const sanitized = cleanCompanyName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'company'
+          const uniqueDomain = `${sanitized}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}.crm`
+          try {
+            comp = await prisma.company.create({
+              data: {
+                name: cleanCompanyName,
+                domain: uniqueDomain,
+                industry: 'Technology',
+                size: 'mid-market',
+              },
+            })
+          } catch (err: any) {
+            if (err?.code === 'P2002') {
+              comp = await prisma.company.findFirst({
+                where: { name: { equals: cleanCompanyName, mode: 'insensitive' } },
+              })
+              if (!comp) throw err
+            } else {
+              throw err
+            }
+          }
+        }
 
         const rawName = String(contactName || 'Primary Contact').trim()
         const nameParts = rawName.split(' ')
@@ -81,7 +99,7 @@ export async function POST(req: NextRequest) {
         const lastName = nameParts.slice(1).join(' ') || 'Contact'
         const email = contactEmail
           ? String(contactEmail).trim().toLowerCase()
-          : `contact.${Date.now().toString(36)}@${domain}`
+          : `contact.${Date.now().toString(36)}@${comp.domain}`
 
         const newContact = await prisma.contact.create({
           data: {
