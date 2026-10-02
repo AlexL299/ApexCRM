@@ -3,6 +3,9 @@ import { KanbanBoard } from '@/components/pipeline/KanbanBoard'
 import { ExportDataButton } from '@/components/ui/ExportDataButton'
 import type { Metadata } from 'next'
 
+// Always fetch fresh — deals can be created/updated at any time
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Pipeline — ApexCRM',
   description: 'Manage your sales pipeline with a visual Kanban board.',

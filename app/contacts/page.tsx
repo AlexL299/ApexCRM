@@ -5,6 +5,9 @@ import { ExportDataButton } from '@/components/ui/ExportDataButton'
 import { ImportContactsButton } from '@/components/contacts/ImportContactsButton'
 import type { Metadata } from 'next'
 
+// Always fetch fresh — contacts can be created/updated at any time
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Contacts — ApexCRM',
   description: 'Browse and manage your contact directory.',

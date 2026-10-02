@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -108,6 +109,11 @@ export async function POST(req: NextRequest) {
         },
       })
     }
+
+    // Revalidate so server pages show the new contact immediately
+    revalidatePath('/contacts')
+    revalidatePath('/dashboard')
+    revalidatePath('/')
 
     return NextResponse.json({ success: true, contact }, { status: 201 })
   } catch (error: any) {

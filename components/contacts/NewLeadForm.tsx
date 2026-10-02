@@ -71,12 +71,14 @@ export function NewLeadForm() {
         type: 'success',
       })
 
+      // Refresh router cache first so contacts page re-fetches fresh data
+      router.refresh()
+
       if (data.contact?.id) {
         router.push(`/contacts/${data.contact.id}`)
       } else {
         router.push('/contacts')
       }
-      router.refresh()
     } catch (err: any) {
       setError(err?.message || 'Error saving lead')
     } finally {

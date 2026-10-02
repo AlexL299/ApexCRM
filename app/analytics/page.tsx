@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   description: 'Executive pipeline analytics, lead intent leaderboard, and activity performance.',
 }
 
+// Always fetch fresh — data changes on every contact/deal mutation
+export const dynamic = 'force-dynamic'
+
+
 function formatCurrency(val: number) {
   if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(2)}M`
   if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}k`
