@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle2, Loader2, Zap, Users, TrendingUp, Shield } from 'lucide-react'
+import Link from 'next/link'
+import { CheckCircle2, Loader2, Zap, Users, TrendingUp, Shield, ArrowRight } from 'lucide-react'
 
 const SOURCES = ['Website', 'Referral', 'LinkedIn', 'Conference', 'Cold Outreach', 'Partnership', 'Other']
 
@@ -16,11 +17,6 @@ export default function LeadCapturePage() {
   })
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
-  const [result, setResult] = useState<{
-    contact?: { name: string; intentScore: number; intentCategory: string }
-    aiSummary?: string
-    deal?: { title: string; stage: string } | null
-  } | null>(null)
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -45,7 +41,6 @@ export default function LeadCapturePage() {
         throw new Error(data.error || 'Submission failed')
       }
 
-      setResult(data)
       setStatus('success')
     } catch (err: any) {
       setErrorMsg(err.message || 'Something went wrong. Please try again.')
@@ -53,51 +48,39 @@ export default function LeadCapturePage() {
     }
   }
 
-  if (status === 'success' && result) {
+  if (status === 'success') {
     return (
       <div style={pageStyle}>
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, maxWidth: 520, margin: 'auto', textAlign: 'center' as const }}>
+          {/* Animated checkmark ring */}
           <div style={successIconWrap}>
-            <CheckCircle2 size={48} color="#22c55e" />
+            <div style={successRing}>
+              <CheckCircle2 size={40} color="#22c55e" />
+            </div>
           </div>
-          <h1 style={headingStyle}>You're on the list!</h1>
-          <p style={subStyle}>
-            Thanks for reaching out. Our team will be in touch soon.
+
+          <h1 style={{ ...headingStyle, fontSize: 26, marginBottom: 12 }}>
+            Thank you for reaching out!
+          </h1>
+
+          <p style={{ ...subStyle, fontSize: 15, lineHeight: 1.75, marginBottom: 28 }}>
+            We&apos;ve received your message. A member of our team will review your
+            inquiry and follow up shortly.
           </p>
 
-          {result.aiSummary && (
-            <div style={aiPanel}>
-              <div style={aiLabel}>
-                <Zap size={12} /> AI Analysis
-              </div>
-              <p style={{ margin: 0, fontSize: 14, color: '#cbd5e1', lineHeight: 1.6 }}>
-                {result.aiSummary}
-              </p>
-            </div>
-          )}
+          <div style={dividerLine} />
 
-          {result.contact && (
-            <div style={statsRow}>
-              <div style={statBox}>
-                <div style={statValue}>{result.contact.intentScore}</div>
-                <div style={statLabel}>Intent Score</div>
-              </div>
-              <div style={statBox}>
-                <div style={{ ...statValue, textTransform: 'capitalize' as const }}>
-                  {result.contact.intentCategory}
-                </div>
-                <div style={statLabel}>Priority</div>
-              </div>
-              {result.deal && (
-                <div style={statBox}>
-                  <div style={{ ...statValue, textTransform: 'capitalize' as const }}>
-                    {result.deal.stage}
-                  </div>
-                  <div style={statLabel}>Pipeline Stage</div>
-                </div>
-              )}
-            </div>
-          )}
+          <p style={{ fontSize: 13, color: '#64748b', marginTop: 24, marginBottom: 24, lineHeight: 1.6 }}>
+            In the meantime, feel free to{' '}
+            <a href="mailto:hello@apexcrm.app" style={{ color: '#60a5fa', textDecoration: 'none' }}>
+              email us directly
+            </a>{' '}
+            if you have an urgent inquiry.
+          </p>
+
+          <Link href="/" style={returnHomeBtn}>
+            Return to Homepage <ArrowRight size={15} />
+          </Link>
         </div>
       </div>
     )
@@ -378,52 +361,35 @@ const successIconWrap: React.CSSProperties = {
   marginBottom: 20,
 }
 
-const aiPanel: React.CSSProperties = {
-  background: 'rgba(37, 99, 235, 0.08)',
-  border: '1px solid rgba(37, 99, 235, 0.2)',
-  borderRadius: 10,
-  padding: '14px 16px',
-  marginTop: 20,
-}
-
-const aiLabel: React.CSSProperties = {
+const successRing: React.CSSProperties = {
+  width: 72,
+  height: 72,
+  borderRadius: '50%',
+  background: 'rgba(34, 197, 94, 0.12)',
+  border: '1px solid rgba(34, 197, 94, 0.3)',
   display: 'flex',
   alignItems: 'center',
-  gap: 5,
-  fontSize: 10,
-  fontWeight: 700,
-  textTransform: 'uppercase',
-  letterSpacing: '0.6px',
-  color: '#60a5fa',
-  marginBottom: 8,
+  justifyContent: 'center',
 }
 
-const statsRow: React.CSSProperties = {
-  display: 'flex',
-  gap: 12,
-  marginTop: 20,
-}
-
-const statBox: React.CSSProperties = {
-  flex: 1,
+const dividerLine: React.CSSProperties = {
+  height: 1,
   background: '#1e293b',
-  border: '1px solid #334155',
-  borderRadius: 10,
-  padding: '12px 14px',
-  textAlign: 'center',
+  width: '100%',
 }
 
-const statValue: React.CSSProperties = {
-  fontSize: 20,
-  fontWeight: 800,
+const returnHomeBtn: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  padding: '11px 22px',
+  background: '#1e293b',
   color: '#f1f5f9',
-  marginBottom: 4,
-}
-
-const statLabel: React.CSSProperties = {
-  fontSize: 10,
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  color: '#64748b',
+  borderRadius: 8,
+  border: '1px solid #334155',
+  fontSize: 13.5,
   fontWeight: 600,
+  textDecoration: 'none',
+  transition: 'all 0.15s ease',
 }
