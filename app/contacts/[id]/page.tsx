@@ -162,8 +162,9 @@ export default async function ContactProfilePage({ params }: Props) {
             </div>
 
             <div style={{ paddingTop: 12 }}>
-              <ContactAIActions contactId={contact.id} contactName={fullName} />
+              <ContactAIActions contactId={contact.id} contactName={fullName} contactEmail={contact.email} />
             </div>
+
 
             <div className="profile-section-body">
               <div className="detail-row">

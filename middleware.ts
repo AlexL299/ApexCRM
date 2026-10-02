@@ -25,15 +25,18 @@ const AUTH_PAGES = ['/login', '/signup'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1. Skip static assets, internal Next.js paths, and public auth API endpoints
+  // 1. Skip static assets, internal Next.js paths, and public endpoints
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
+    pathname.startsWith('/api/leads/webhook') ||
+    pathname === '/lead-capture' ||
     pathname === '/favicon.ico' ||
     pathname.includes('.')
   ) {
     return NextResponse.next();
   }
+
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   let isAuthenticated = false;
